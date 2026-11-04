@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Record Collection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ffffff;--ink:#f6efe4;--dim:rgba(246,239,228,.7);--card:#16110c}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;overscroll-behavior:none}
+body.embed .hero{display:none}
+.hero{color:#16110c;height:100svh;display:flex;flex-direction:column;justify-content:center;padding:0 6vw;position:relative}
+.hero h1{font-family:'Archivo Black',sans-serif;font-size:clamp(48px,12vw,190px);line-height:.88;letter-spacing:-.02em;text-transform:uppercase}
+.hero p{font-size:clamp(18px,2.4vw,30px);margin-top:3vh;color:rgba(22,17,12,.6)}
+.hero .count{font-family:'Archivo Black',sans-serif;color:#16110c}
+.cue{position:absolute;bottom:4vh;left:6vw;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:rgba(22,17,12,.55);animation:bob 2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(8px)}}
+.wall{position:relative;width:100vw;height:100svh;overflow:hidden;touch-action:none;cursor:grab}
+body.embed .wall{height:100vh}
+canvas{display:block;width:100%;height:100%}
+.tag{position:absolute;left:16px;top:14px;pointer-events:none;background:#fff;color:#16110c;padding:10px 14px;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,.15);font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:clamp(14px,1.6vw,20px);letter-spacing:.02em}
+.tag small{display:block;font-family:Inter;font-weight:400;font-size:12px;letter-spacing:.15em;opacity:.8;margin-top:4px}
+.btn{font:600 13px Inter;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:rgba(20,14,8,.55);border:1px solid rgba(246,239,228,.35);border-radius:999px;padding:11px 18px;cursor:pointer;backdrop-filter:blur(6px)}
+.btn:hover{background:rgba(20,14,8,.8)}
+.shake{position:absolute;right:20px;top:16px}
+.hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);font-size:13px;color:var(--ink);background:rgba(20,14,8,.5);padding:8px 14px;border-radius:999px;pointer-events:none;transition:opacity .6s;white-space:nowrap}
+/* flipped sleeve */
+.veil{position:absolute;inset:0;background:rgba(10,7,4,.55);display:none;align-items:center;justify-content:center;perspective:1400px;padding:16px}
+.veil.on{display:flex}
+.flip{width:min(78vw,62vh,420px);aspect-ratio:1;position:relative;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.8,.2,1)}
+.flip.turned{transform:rotateY(180deg)}
+.flip.turned .front{pointer-events:none}
+.face.back::before{content:"";position:absolute;inset:0;background:var(--art) center/1600% 1600%;filter:blur(30px) brightness(.35) saturate(1.3);transform:scale(1.3);z-index:-1}
+.face.back{isolation:isolate}
+.face{position:absolute;inset:0;backface-visibility:hidden;border-radius:3px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+#cover{width:100%;height:100%}
+.face.front::after{content:"";position:absolute;inset:0;background:linear-gradient(130deg,rgba(255,255,255,.28),rgba(255,255,255,0) 40%)}
+.face.back{transform:rotateY(180deg);background:var(--card);padding:clamp(20px,5%,34px);display:flex;flex-direction:column;justify-content:space-between}
+.back .artist{font-family:'Archivo Black',sans-serif;font-size:clamp(20px,5.5vw,34px);line-height:1;text-transform:uppercase}
+.back .title{font-size:clamp(15px,3.6vw,20px);color:var(--dim);margin-top:10px}
+.back .track{font-size:13px;color:var(--dim);margin-top:4px;min-height:1em}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.play{width:58px;height:58px;border-radius:50%;border:0;background:var(--ink);color:var(--card);font-size:20px;cursor:pointer;flex:none}
+.play:disabled{opacity:.35;cursor:default}
+.credit{font-size:11px;color:var(--dim)}
+.credit a{color:var(--dim)}
+.bar{height:3px;background:rgba(246,239,228,.15);margin-top:14px;border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ink)}
+.close{position:absolute;top:16px;right:16px}
+/* gate */
+.gate{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(10,7,4,.7);padding:16px;z-index:5}
+.gate.on{display:flex}
+.gate .box{background:var(--card);max-width:440px;width:100%;padding:34px 30px;border-radius:6px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.gate h2{font-family:'Archivo Black',sans-serif;text-transform:uppercase;font-size:28px;line-height:1}
+.gate p{color:var(--dim);margin:14px 0 22px;line-height:1.5}
+.gate .mail{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.gate a.btn{text-decoration:none}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;letter-spacing:.2em;font-size:13px;text-transform:uppercase;pointer-events:none}
+</style>
+</head>
+<body>
+<section class="hero">
+  <h1>Simon<br>Taylor</h1>
+  <p>Scroll my record collection — <span class="count" id="count">0</span> records.</p>
+  <div class="cue">↓ Scroll</div>
+</section>
+
+<section class="wall" id="wall">
+  <canvas id="cv"></canvas>
+  <div class="loading" id="loading">Pulling records…</div>
+  <div class="tag">Simon Taylor — The Wall<small id="tagcount"></small></div>
+  <button class="btn shake" id="shake">Shuffle the pile</button>
+  <div class="hint" id="hint">Drag to dig · tap a record to flip it</div>
+
+  <div class="veil" id="veil">
+    <button class="btn close" id="close">Close</button>
+    <div class="flip" id="flip">
+      <div class="face front"><div id="cover" role="img" aria-label="Album cover"></div></div>
+      <div class="face back">
+        <div><div class="artist" id="artist"></div><div class="title" id="title"></div></div>
+        <div>
+          <div class="row"><button class="play" id="play" aria-label="Play preview">▶</button>
+            <div><div class="track" id="track"></div><div class="credit" id="credit"></div></div></div>
+          <div class="bar"><i id="prog"></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gate" id="gate"><div class="box">
+    <h2>Like what you hear?</h2>
+    <p>You've had your two free spins. Let's talk about music for your project — I'll dig out the rest.</p>
+    <div class="mail">
+      <a class="btn" id="mailto">Email me</a>
+      <button class="btn" id="copy">Copy address</button>
+    </div>
+    <p style="margin:18px 0 0;font-size:13px"><a href="#" id="gateclose" style="color:var(--dim)">Keep browsing</a></p>
+  </div></div>
+</section>
+
+<script>
+const EMAIL = "captainstrobe@gmail.com";   // contact address shown in the pop-up
+const FREE_PLAYS = 2;
+const BASE = "";                           // where wall.json / atlas_N.jpg / c/ live (same folder by default)
+
+if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
+const $ = id => document.getElementById(id);
+const wall = $("wall"), cv = $("cv"), ctx = cv.getContext("2d");
+let W, H, DPR, S, data, atlases = [], his = [], recs = [], order = [];
+
+// ---------- gate (soft: remembered in this browser)
+const store = { get(){ try { return +localStorage.getItem("wallPlays") || 0 } catch(e){ return this.m||0 } },
+                set(v){ this.m = v; try { localStorage.setItem("wallPlays", v) } catch(e){} } };
+$("mailto").href = "mailto:" + EMAIL + "?subject=" + encodeURIComponent("Music for my project");
+$("copy").onclick = () => { navigator.clipboard?.writeText(EMAIL); $("copy").textContent = "Copied ✓"; };
+$("gateclose").onclick = e => { e.preventDefault(); $("gate").classList.remove("on"); };
+
+// ---------- layout
+function size(){
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = wall.clientWidth; H = wall.clientHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  S = Math.max(78, Math.min(150, Math.min(W, H) / 6.5));
+}
+addEventListener("resize", () => { const ow = W, oh = H; size(); for (const r of recs){ r.x *= W/ow; r.y *= H/oh; } });
+
+function scatter(burst){
+  for (const r of recs){
+    if (burst){ const a = Math.random()*6.283, v = 6 + Math.random()*14; r.vx += Math.cos(a)*v; r.vy += Math.sin(a)*v; r.vr += (Math.random()-.5)*.08; }
+    else { r.x = Math.random()*W; r.y = Math.random()*H; r.a = (Math.random()-.5)*.9; r.vx = r.vy = r.vr = 0; }
+  }
+  order.sort(() => Math.random() - .5);
+}
+
+// ---------- physics: pointer stirs the pile, sleeves glide and settle
+const P = { x:-1e4, y:-1e4, px:0, py:0, vx:0, vy:0, down:false, moved:0, grab:null, gx:0, gy:0 };
+let last = performance.now();
+function step(){
+  const now = performance.now(), dt = Math.min(2.5, (now - last) / 16.67); last = now;   // frame-rate independent
+  // smoothed pointer velocity: no jerks from uneven pointer events
+  const rawx = (P.x - P.px) / dt, rawy = (P.y - P.py) / dt;
+  P.vx += (rawx - P.vx) * .35; P.vy += (rawy - P.vy) * .35;
+  P.px = P.x; P.py = P.y;
+  const speed = Math.hypot(P.vx, P.vy), R = S * (P.down ? 1.0 : .8), R2 = R * R;
+  const fric = Math.pow(.935, dt), rfric = Math.pow(.9, dt), n = order.length, m = S * .3;
+  if (speed > .3){
+    for (let j = 0; j < n; j++){
+      const r = recs[order[j]]; if (r === P.grab) continue;
+      const ex = r.x - P.x, ey = r.y - P.y, d2 = ex*ex + ey*ey;
+      if (d2 > R2) continue;
+      const d = Math.sqrt(d2) || 1, fall = 1 - d / R, w = fall * fall * (3 - 2 * fall);  // smoothstep falloff
+      const depth = .25 + .75 * (j / n);                         // top of the pile moves most
+      const k = w * depth * (P.down ? .22 : .1) * dt;
+      // carried along with the hand + parted sideways out of its path
+      r.vx += (P.vx * k) + (ex / d) * speed * k * .35;
+      r.vy += (P.vy * k) + (ey / d) * speed * k * .35;
+      r.vr += (ex * P.vy - ey * P.vx) / R2 * k * .5;
+    }
+  }
+  for (const r of recs){
+    if (r === P.grab) continue;
+    if (r.vx || r.vy || r.vr){
+      r.x += r.vx * dt; r.y += r.vy * dt; r.a += r.vr * dt;
+      r.vx *= fric; r.vy *= fric; r.vr *= rfric;
+      if (Math.abs(r.vx) + Math.abs(r.vy) < .01){ r.vx = r.vy = 0 } if (Math.abs(r.vr) < .0002) r.vr = 0;
+      if (r.x < -m){ r.x = -m; r.vx = Math.abs(r.vx)*.5 } if (r.x > W+m){ r.x = W+m; r.vx = -Math.abs(r.vx)*.5 }
+      if (r.y < -m){ r.y = -m; r.vy = Math.abs(r.vy)*.5 } if (r.y > H+m){ r.y = H+m; r.vy = -Math.abs(r.vy)*.5 }
+    }
+  }
+  // held sleeve follows the finger on a soft spring and tilts with the swing
+  const g = P.grab;
+  if (g){
+    const tx = P.x + P.gx, ty = P.y + P.gy, e = 1 - Math.pow(.6, dt);
+    const nx = g.x + (tx - g.x) * e, ny = g.y + (ty - g.y) * e;
+    g.vx = (nx - g.x) / dt; g.vy = (ny - g.y) / dt; g.x = nx; g.y = ny;
+    g.a += ((g.a0 + Math.max(-.5, Math.min(.5, P.vx * .012))) - g.a) * (1 - Math.pow(.85, dt));
+    g.lift += (1 - g.lift) * .25;
+  }
+  for (const r of recs) if (r.lift > 0 && r !== g){ r.lift *= .85; if (r.lift < .01) r.lift = 0; }
+}
+
+function draw(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  const t = data.tile, g = data.grid, h = S/2;
+  for (const i of order){
+    const r = recs[i], im = atlases[r.k];
+    const sc = 1 + (r.lift || 0) * .08, c = Math.cos(r.a) * DPR * sc, s = Math.sin(r.a) * DPR * sc;
+    ctx.setTransform(c, s, -s, c, r.x * DPR, r.y * DPR);
+    const sh = 3 + (r.lift || 0) * 12;
+    ctx.fillStyle = r.lift ? "rgba(0,0,0,.22)" : "rgba(0,0,0,.12)"; ctx.fillRect(-h+sh*.5, -h+sh, S, S);   // drop shadow, deeper when lifted
+    const hi = his[(r.i / 256) | 0], q = r.i % 256;
+    if (hi && hi.ok) ctx.drawImage(hi, (q % 16)*256, ((q / 16)|0)*256, 256, 256, -h, -h, S, S);   // sharp Retina tile
+    else if (im && im.complete) ctx.drawImage(im, (r.p % g)*t, ((r.p / g)|0)*t, t, t, -h, -h, S, S);
+    else { ctx.fillStyle = "#ececec"; ctx.fillRect(-h, -h, S, S); }
+    ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fillRect(-h, -h, S, S*.35);    // sleeve gloss
+  }
+}
+function loop(){ step(); draw(); requestAnimationFrame(loop); }
+
+function topAt(x, y){
+  for (let j = order.length - 1; j >= 0; j--){
+    const r = recs[order[j]], c = Math.cos(-r.a), s = Math.sin(-r.a);
+    const lx = (x-r.x)*c - (y-r.y)*s, ly = (x-r.x)*s + (y-r.y)*c;
+    if (Math.abs(lx) < S/2 && Math.abs(ly) < S/2) return j;
+  }
+  return -1;
+}
+function local(e){ const b = wall.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; }
+
+cv.addEventListener("pointerdown", e => {
+  [P.x, P.y] = local(e); P.px = P.x; P.py = P.y; P.down = true; P.moved = 0;
+  const j = topAt(P.x, P.y);
+  if (j >= 0){                                                                      // lift it to the top
+    const i = order.splice(j, 1)[0]; order.push(i); const g = recs[i];
+    P.grab = g; P.gx = g.x - P.x; P.gy = g.y - P.y; g.a0 = g.a; g.vx = g.vy = g.vr = 0; g.lift = g.lift || 0;
+  }
+  cv.setPointerCapture(e.pointerId); wall.style.cursor = "grabbing";
+});
+cv.addEventListener("pointermove", e => {
+  const [x, y] = local(e);
+  if (P.x < -5000){ P.px = x; P.py = y; P.vx = P.vy = 0; }   // pointer just entered: no jump
+  else P.moved += Math.hypot(x - P.x, y - P.y);
+  P.x = x; P.y = y;
+  if (P.moved > 30) $("hint").style.opacity = 0;
+});
+const up = e => {
+  if (!P.down) return; P.down = false; wall.style.cursor = "grab";
+  const g = P.grab; P.grab = null;
+  if (g && P.moved < 8) openRecord(recs.indexOf(g));
+  else if (g){ g.vx = P.vx * .9; g.vy = P.vy * .9; g.vr = P.vx * .0015; }        // throw with the hand's momentum
+};
+cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+cv.addEventListener("pointerleave", e => { if (!P.down){ P.x = P.px = -1e4; P.y = P.py = -1e4; P.vx = P.vy = 0; } });
+$("shake").onclick = () => scatter(true);
+
+// ---------- flipped record + gated preview
+const audio = new Audio(); let cur = -1;
+function openRecord(i){
+  const [artist, title, , , clip, link] = data.items[i]; cur = i;
+  // cover = this record's 256px tile in the sharp atlas (falls back to the quick atlas)
+  const k = (i / 256) | 0, q = i % 256, hiOk = his[k] && his[k].ok;
+  const css = hiOk
+    ? `url("${BASE}hi_${k}.jpg") ${(q % 16) / 15 * 100}% ${((q / 16) | 0) / 15 * 100}% / 1600% 1600%`
+    : `url("${BASE}atlas_${recs[i].k}.jpg") ${(recs[i].p % data.grid) / (data.grid - 1) * 100}% ${((recs[i].p / data.grid) | 0) / (data.grid - 1) * 100}% / ${data.grid * 100}% ${data.grid * 100}%`;
+  $("cover").style.background = css;
+  document.querySelector(".face.back").style.setProperty("--art", css.split(")")[0] + ")");
+  $("artist").textContent = artist.replace(/\s*\(\d+\)$/, "");
+  $("title").textContent = title;
+  $("track").textContent = clip ? "" : "No preview for this one";
+  $("credit").innerHTML = clip ? 'Preview via Apple Music · <a href="' + link + '" target="_blank" rel="noopener">Open ↗</a>' : "";
+  $("play").disabled = !clip; $("play").textContent = "▶"; $("prog").style.width = 0;
+  $("flip").classList.remove("turned"); $("veil").classList.add("on");
+  requestAnimationFrame(() => setTimeout(() => $("flip").classList.add("turned"), 60));
+}
+function closeRecord(){ audio.pause(); $("veil").classList.remove("on"); }
+$("close").onclick = closeRecord;
+$("veil").addEventListener("click", e => { if (e.target === $("veil")) closeRecord(); });
+$("play").onclick = () => {
+  if (!audio.paused && audio.dataset.i == cur){ audio.pause(); $("play").textContent = "▶"; return; }
+  if (audio.dataset.i != cur){
+    const n = store.get();
+    if (n >= FREE_PLAYS){ closeRecord(); $("gate").classList.add("on"); return; }
+    store.set(n + 1); audio.src = data.items[cur][4]; audio.dataset.i = cur;
+  }
+  audio.play(); $("play").textContent = "❚❚";
+};
+audio.ontimeupdate = () => { $("prog").style.width = (audio.currentTime / (audio.duration || 30) * 100) + "%"; };
+audio.onended = () => { $("play").textContent = "▶"; };
+addEventListener("keydown", e => { if (e.key === "Escape"){ closeRecord(); $("gate").classList.remove("on"); } });
+
+// ---------- count-up headline
+function countUp(n){
+  const el = $("count"), t0 = performance.now();
+  (function f(t){ const k = Math.min(1, (t - t0) / 2200); el.textContent = Math.round(n * (1 - Math.pow(1 - k, 3))).toLocaleString(); if (k < 1) requestAnimationFrame(f); })(t0);
+}
+
+// ---------- boot
+fetch(BASE + "wall.json").then(r => r.json()).then(d => {
+  data = d; size();
+  recs = d.items.map((it, i) => ({ i, k: it[2], p: it[3], x:0, y:0, a:0, vx:0, vy:0, vr:0 }));
+  ctx.imageSmoothingQuality = "high";
+  // sharp atlases load after the quick ones, one at a time; decoded off-thread so the pile doesn't hitch
+  const nHi = Math.ceil(d.items.length / 256);
+  (async () => { for (let k = 0; k < nHi; k++){ const im = new Image(); im.src = BASE + "hi_" + k + ".jpg";
+    try { await im.decode(); im.ok = true; his[k] = im; } catch(e){} } })();
+  order = recs.map((_, i) => i); scatter(false);
+  for (let k = 0; k < d.atlases; k++){ const im = new Image(); im.src = BASE + "atlas_" + k + ".jpg"; atlases[k] = im; }
+  atlases[0].onload = () => $("loading").remove();
+  countUp(d.items.length);
+  $("tagcount").textContent = d.items.length.toLocaleString() + " records";
+  loop();
+});
+</script>
+</body>
+</html>
