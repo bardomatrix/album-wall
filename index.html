@@ -124,7 +124,7 @@ function size(){
   cv.width = W * DPR; cv.height = H * DPR;
   S = Math.max(78, Math.min(150, Math.min(W, H) / 6.5));
 }
-addEventListener("resize", () => { const ow = W, oh = H; size(); for (const r of recs){ r.x *= W/ow; r.y *= H/oh; } });
+addEventListener("resize", () => { const ow = W, oh = H; size(); wake(); for (const r of recs){ r.x *= W/ow; r.y *= H/oh; } });
 
 function scatter(burst){
   for (const r of recs){
@@ -138,6 +138,7 @@ function scatter(burst){
 const P = { x:-1e4, y:-1e4, px:0, py:0, vx:0, vy:0, down:false, moved:0, grab:null, gx:0, gy:0 };
 let last = performance.now();
 function step(){
+  let movers = 0;
   const now = performance.now(), dt = Math.min(2.5, (now - last) / 16.67); last = now;   // frame-rate independent
   // smoothed pointer velocity: no jerks from uneven pointer events
   const rawx = (P.x - P.px) / dt, rawy = (P.y - P.py) / dt;
@@ -162,6 +163,7 @@ function step(){
   for (const r of recs){
     if (r === P.grab) continue;
     if (r.vx || r.vy || r.vr){
+      movers++;
       r.x += r.vx * dt; r.y += r.vy * dt; r.a += r.vr * dt;
       r.vx *= fric; r.vy *= fric; r.vr *= rfric;
       if (Math.abs(r.vx) + Math.abs(r.vy) < .01){ r.vx = r.vy = 0 } if (Math.abs(r.vr) < .0002) r.vr = 0;
@@ -178,7 +180,8 @@ function step(){
     g.a += ((g.a0 + Math.max(-.5, Math.min(.5, P.vx * .012))) - g.a) * (1 - Math.pow(.85, dt));
     g.lift += (1 - g.lift) * .25;
   }
-  for (const r of recs) if (r.lift > 0 && r !== g){ r.lift *= .85; if (r.lift < .01) r.lift = 0; }
+  for (const r of recs) if (r.lift > 0 && r !== g){ r.lift *= .85; movers++; if (r.lift < .01) r.lift = 0; }
+  return movers > 0 || speed > .3 || !!g;
 }
 
 function draw(){
@@ -192,13 +195,21 @@ function draw(){
     const sh = 3 + (r.lift || 0) * 12;
     ctx.fillStyle = r.lift ? "rgba(0,0,0,.22)" : "rgba(0,0,0,.12)"; ctx.fillRect(-h+sh*.5, -h+sh, S, S);   // drop shadow, deeper when lifted
     const hi = his[(r.i / 256) | 0], q = r.i % 256;
-    if (hi && hi.ok) ctx.drawImage(hi, (q % 16)*256, ((q / 16)|0)*256, 256, 256, -h, -h, S, S);   // sharp Retina tile
+    if (hi && hi.ok) ctx.drawImage(hi, (q % 16)*144, ((q / 16)|0)*144, 144, 144, -h, -h, S, S);   // sharp Retina tile
     else if (im && im.complete) ctx.drawImage(im, (r.p % g)*t, ((r.p / g)|0)*t, t, t, -h, -h, S, S);
     else { ctx.fillStyle = "#ececec"; ctx.fillRect(-h, -h, S, S); }
     ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fillRect(-h, -h, S, S*.35);    // sleeve gloss
   }
 }
-function loop(){ step(); draw(); requestAnimationFrame(loop); }
+let drawn = 0, awake = true, dirty = true, onScreen = true;
+function wake(){ dirty = true; }
+function loop(){
+  requestAnimationFrame(loop);
+  if (!onScreen || document.hidden || !(awake || dirty)) return;   // idle: costs nothing
+  dirty = false; awake = step(); draw(); drawn++;
+}
+new IntersectionObserver(es => { onScreen = es[0].isIntersecting; if (onScreen) wake(); }).observe(wall);
+document.addEventListener("visibilitychange", wake);
 
 function topAt(x, y){
   for (let j = order.length - 1; j >= 0; j--){
@@ -211,7 +222,7 @@ function topAt(x, y){
 function local(e){ const b = wall.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; }
 
 cv.addEventListener("pointerdown", e => {
-  [P.x, P.y] = local(e); P.px = P.x; P.py = P.y; P.down = true; P.moved = 0;
+  [P.x, P.y] = local(e); P.px = P.x; P.py = P.y; P.down = true; P.moved = 0; wake();
   const j = topAt(P.x, P.y);
   if (j >= 0){                                                                      // lift it to the top
     const i = order.splice(j, 1)[0]; order.push(i); const g = recs[i];
@@ -223,18 +234,18 @@ cv.addEventListener("pointermove", e => {
   const [x, y] = local(e);
   if (P.x < -5000){ P.px = x; P.py = y; P.vx = P.vy = 0; }   // pointer just entered: no jump
   else P.moved += Math.hypot(x - P.x, y - P.y);
-  P.x = x; P.y = y;
+  P.x = x; P.y = y; wake();
   if (P.moved > 30) $("hint").style.opacity = 0;
 });
 const up = e => {
-  if (!P.down) return; P.down = false; wall.style.cursor = "grab";
+  if (!P.down) return; P.down = false; wall.style.cursor = "grab"; wake();
   const g = P.grab; P.grab = null;
   if (g && P.moved < 8) openRecord(recs.indexOf(g));
   else if (g){ g.vx = P.vx * .9; g.vy = P.vy * .9; g.vr = P.vx * .0015; }        // throw with the hand's momentum
 };
 cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
 cv.addEventListener("pointerleave", e => { if (!P.down){ P.x = P.px = -1e4; P.y = P.py = -1e4; P.vx = P.vy = 0; } });
-$("shake").onclick = () => scatter(true);
+$("shake").onclick = () => { scatter(true); wake(); };
 
 // ---------- flipped record + gated preview
 const audio = new Audio(); let cur = -1;
@@ -285,10 +296,11 @@ fetch(BASE + "wall.json").then(r => r.json()).then(d => {
   // sharp atlases load after the quick ones, one at a time; decoded off-thread so the pile doesn't hitch
   const nHi = Math.ceil(d.items.length / 256);
   (async () => { for (let k = 0; k < nHi; k++){ const im = new Image(); im.src = BASE + "hi_" + k + ".jpg";
-    try { await im.decode(); im.ok = true; his[k] = im; } catch(e){} } })();
+    try { await im.decode(); im.ok = true; his[k] = im; wake(); } catch(e){} } })();
   order = recs.map((_, i) => i); scatter(false);
   for (let k = 0; k < d.atlases; k++){ const im = new Image(); im.src = BASE + "atlas_" + k + ".jpg"; atlases[k] = im; }
-  atlases[0].onload = () => $("loading").remove();
+  atlases.forEach(im => im.onload = wake);
+  atlases[0].onload = () => { $("loading").remove(); wake(); };
   countUp(d.items.length);
   $("tagcount").textContent = d.items.length.toLocaleString() + " records";
   loop();
